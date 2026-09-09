@@ -1,1 +1,1 @@
-"""Config persistence layer (populated in a later slice)."""
+"""Config persistence layer: JSON load/save with fallback."""
