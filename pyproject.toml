@@ -19,6 +19,7 @@ build = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+py-modules = ["state"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
