@@ -1,0 +1,13 @@
+.atl/
+.engram/
+__pycache__/
+.venv/
+
+# Python
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Packaging / build artifacts
+build/
+dist/
