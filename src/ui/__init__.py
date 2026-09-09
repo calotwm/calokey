@@ -1,1 +1,1 @@
-"""Pygame UI layer (populated in a later slice)."""
+"""Pygame UI layer: keyboard, chord display, port selector, and the app loop."""
