@@ -1,1 +1,1 @@
-"""MIDI input/output layer (populated in a later slice)."""
+"""MIDI input/output layer: discovery, input thread, output, and SysEx."""
