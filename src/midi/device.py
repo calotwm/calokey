@@ -8,7 +8,7 @@ No hardware is touched at import time: ``pygame.midi`` is initialized lazily
 inside each function so the module stays importable in headless tests.
 """
 
-import pygame.midi
+import pygame.midi  # pyright: ignore[reportMissingImports]
 
 DEVICE_NAME_SUBSTRING = "nanoKEY"
 
@@ -41,6 +41,27 @@ def discover_nanokey() -> int | None:
         if DEVICE_NAME_SUBSTRING.lower() in name.lower():
             return device_id
     return None
+
+
+def open_nanokey_output() -> pygame.midi.Output | None:
+    """Open the nanoKEY's output interface (for SysEx config), or ``None``."""
+    _ensure_init()
+    for device_id in range(pygame.midi.get_count()):
+        info = pygame.midi.get_device_info(device_id)
+        if info is None:
+            continue
+        if not bool(info[3]):  # skip non-output interfaces
+            continue
+        name = _device_name(device_id)
+        if DEVICE_NAME_SUBSTRING.lower() in name.lower():
+            return pygame.midi.Output(device_id)
+    return None
+
+
+def send_sysex(output, data) -> None:
+    """Write a full SysEx message (bytes, including F0/F7) to ``output``."""
+    _ensure_init()
+    output.write_sys_ex(0, list(data))
 
 
 def open_input(device_id: int) -> pygame.midi.Input:

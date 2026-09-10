@@ -8,8 +8,9 @@ caller via ``set_device_state``.
 
 import pygame
 
+from midi import sysex
 from midi.input_thread import parse_event
-from state import FADER_ROOT, FADER_TYPE
+from state import DeviceConfig
 from ui.chord_display import ChordDisplay
 from ui.keyboard import Keyboard
 from ui.port_selector import PortSelector
@@ -18,16 +19,12 @@ FPS = 60
 BACKGROUND = (30, 30, 40)
 WAITING_COLOR = (220, 220, 220)
 
-# Default nanoKEY Studio pad note numbers (pads 1..8). Runtime discovery
-# (slice 4 concern) refines these from live traffic; this is the best-effort
-# default mapping until the device's actual note set is observed.
-DEFAULT_PAD_NOTES = (60, 62, 64, 65, 67, 69, 71, 72)
-
 
 class App:
     """Renders the app and routes MIDI events to state + output."""
 
-    def __init__(self, state, sender, width: int = 960, height: int = 540):
+    def __init__(self, state, sender, width: int = 960, height: int = 540,
+                 device_config: DeviceConfig | None = None):
         pygame.init()
         pygame.font.init()
         self.surface = pygame.display.set_mode((width, height))
@@ -37,7 +34,7 @@ class App:
         self.sender = sender
         self.running = True
         self.device_connected = False
-        self.pad_notes = list(DEFAULT_PAD_NOTES)  # pad 1..8 note numbers
+        self.device_config = device_config or DeviceConfig.defaults()
 
         font = pygame.font.Font(None, 36)
         self.keyboard = Keyboard(0, 127, 20, 300, width - 40, 200)
@@ -57,14 +54,16 @@ class App:
     def handle_event(self, event: tuple) -> bool:
         """Handle one parsed queue event; return True if a redraw is needed."""
         kind, data = event
+        if kind == "sysex":
+            return self._handle_sysex(data)
+        if kind in ("cc", "note_on", "note_off"):
+            self.device_config.global_channel = data[0]
         if kind == "cc":
             _, control, value = data
-            if control == 20:
-                changed = self.state.apply_fader_cc(FADER_ROOT, value)
-            elif control == 21:
-                changed = self.state.apply_fader_cc(FADER_TYPE, value)
-            else:
+            fader = self.device_config.fader_for_cc(control)
+            if fader is None:
                 return False
+            changed = self.state.apply_fader_cc(fader, value)
             if changed:
                 self.keyboard.set_scale_notes(self.state.scale_notes())
             return changed
@@ -90,18 +89,27 @@ class App:
                 self._release_pad(pad)
                 return True
             return False
-        return False  # "sysex" and unknown: no redraw
+        return False  # unknown: no redraw
+
+    def _handle_sysex(self, data: tuple) -> bool:
+        """Update the discovered device config from a bulk-dump reply.
+
+        Returns True when a new config was applied (so the UI can refresh);
+        scene-change notifications and unknown payloads are ignored.
+        """
+        config = sysex.parse_bulk_dump(data)
+        if config is None:
+            return False
+        self.device_config = config
+        return True
 
     def _note_to_pad(self, note: int) -> int | None:
         """Map an incoming MIDI note to a nanoKEY pad number (1-8).
 
-        Looks up the note in the configured pad-note set; returns ``None`` for
-        notes not belonging to a pad (e.g. keyboard keys).
+        Uses the discovered pad-note assignments; returns ``None`` for notes not
+        belonging to a pad (e.g. keyboard keys).
         """
-        try:
-            return self.pad_notes.index(note) + 1
-        except ValueError:
-            return None
+        return self.device_config.pad_for_note(note)
 
     def _sound_pad(self, pad: int) -> None:
         try:
