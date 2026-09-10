@@ -54,7 +54,10 @@ def open_nanokey_output() -> pygame.midi.Output | None:
             continue
         name = _device_name(device_id)
         if DEVICE_NAME_SUBSTRING.lower() in name.lower():
-            return pygame.midi.Output(device_id)
+            try:
+                return pygame.midi.Output(device_id)
+            except Exception:
+                return None
     return None
 
 
@@ -64,10 +67,13 @@ def send_sysex(output, data) -> None:
     output.write_sys_ex(0, list(data))
 
 
-def open_input(device_id: int) -> pygame.midi.Input:
-    """Open the MIDI input interface for ``device_id``."""
+def open_input(device_id: int) -> pygame.midi.Input | None:
+    """Open the MIDI input interface for ``device_id``; returns ``None`` on failure."""
     _ensure_init()
-    return pygame.midi.Input(device_id)
+    try:
+        return pygame.midi.Input(device_id)
+    except Exception:
+        return None
 
 
 def list_output_ports() -> list[tuple[int, str]]:
@@ -84,9 +90,12 @@ def list_output_ports() -> list[tuple[int, str]]:
 
 
 def open_output(name: str) -> pygame.midi.Output | None:
-    """Open an output port by exact name; returns ``None`` if not found."""
+    """Open an output port by exact name; returns ``None`` if not found or unavailable."""
     _ensure_init()
     for device_id, port_name in list_output_ports():
         if port_name == name:
-            return pygame.midi.Output(device_id)
+            try:
+                return pygame.midi.Output(device_id)
+            except Exception:
+                return None
     return None

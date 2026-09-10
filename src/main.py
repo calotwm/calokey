@@ -67,8 +67,9 @@ def build_app(config_path=None) -> tuple[App, queue.Queue, InputThread | None, C
     device_id = device.discover_nanokey()
     if device_id is not None:
         midi_input = device.open_input(device_id)
-        thread = InputThread(midi_input, q)
-        _request_device_config()  # 9.1: read actual config on connect
+        if midi_input is not None:
+            thread = InputThread(midi_input, q)
+            _request_device_config()  # 9.1: read actual config on connect
 
     active_name, current_output = _initial_output(output_name)
     sender = ChordSender(current_output) if current_output is not None else None
@@ -133,10 +134,11 @@ def main() -> None:
                 device_id = device.discover_nanokey()
                 if device_id is not None:
                     midi_input = device.open_input(device_id)
-                    thread = InputThread(midi_input, q)
-                    thread.start()
-                    app.set_device_state(True)
-                    _request_device_config()  # 9.1: read config on (re)connect
+                    if midi_input is not None:
+                        thread = InputThread(midi_input, q)
+                        thread.start()
+                        app.set_device_state(True)
+                        _request_device_config()  # 9.1: read config on (re)connect
             app.draw()
     finally:
         if thread is not None:
