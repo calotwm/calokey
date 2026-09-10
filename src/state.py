@@ -18,6 +18,57 @@ FADER_ROOT = 0  # knob 1 (CC 20) selects the root note
 FADER_TYPE = 1  # knob 2 (CC 21) selects the scale type
 
 
+class DeviceConfig:
+    """Runtime-discovered nanoKEY Studio configuration.
+
+    Holds the actual knob CC numbers and pad note assignments read from the
+    device via SysEx bulk dump (rather than assumed defaults), plus the device's
+    global MIDI channel observed from live traffic.
+
+    ``DeviceConfig.defaults()`` is the pre-discovery fallback and matches the
+    nanoKEY Studio factory defaults (knobs 1-8 = CC 20..27; pads 1-8 = the
+    C-major note set). The app replaces it with discovered values as soon as the
+    device answers a bulk-dump inquiry.
+    """
+
+    DEFAULT_KNOB_CCS = (20, 21, 22, 23, 24, 25, 26, 27)
+    DEFAULT_PAD_NOTES = (60, 62, 64, 65, 67, 69, 71, 72)
+
+    def __init__(self, knob_ccs=None, pad_notes=None, global_channel: int = 0):
+        self.knob_ccs: list[int] = (
+            list(knob_ccs) if knob_ccs is not None else list(self.DEFAULT_KNOB_CCS)
+        )
+        self.pad_notes: list[int] = (
+            list(pad_notes) if pad_notes is not None else list(self.DEFAULT_PAD_NOTES)
+        )
+        self.global_channel = global_channel
+
+    @classmethod
+    def defaults(cls) -> "DeviceConfig":
+        return cls()
+
+    def fader_for_cc(self, control: int) -> int | None:
+        """Map a knob CC number to a fader index (``FADER_ROOT``/``FADER_TYPE``).
+
+        Returns ``None`` for CC numbers that are not knob 1 or knob 2 (knobs 3-8
+        and unrelated controls are ignored by the scale engine).
+        """
+        try:
+            index = self.knob_ccs.index(control)
+        except ValueError:
+            return None
+        if index in (FADER_ROOT, FADER_TYPE):
+            return index
+        return None
+
+    def pad_for_note(self, note: int) -> int | None:
+        """Map an incoming note number to a pad number (1-8), or ``None``."""
+        try:
+            return self.pad_notes.index(note) + 1
+        except ValueError:
+            return None
+
+
 def cc_to_position(cc: int) -> int:
     """Map a MIDI CC value (0..127) to a position (0..11)."""
     if not isinstance(cc, int) or isinstance(cc, bool):
